@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+  <script>
+    let gameStarted = false;
+    let score = 0;
+    let scoreInterval;
+
+    function startGame() {
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("countdown").style.display = "flex";
+      let countdown = 2;
+
+      const countdownInterval = setInterval(() => {
+        document.getElementById("countdown-number").textContent = countdown;
+        countdown--;
+
+        if (countdown < 0) {
+          clearInterval(countdownInterval);
+          document.getElementById("countdown").style.display = "none";
+          score = 0;
+          updateScore();
+          scoreInterval = setInterval(() => {
+            if (gameStarted) {
+              updateScore();
+            }
+          }, 1000);
+          document.getElementById("game-over").style.display = "none";
+          gameStarted = true;
+        }
+      }, 1000);
+    }
+
+    function updateScore() {
+      document.getElementById("score").textContent = "Score: " + score;
+      document.getElementById("final-score").textContent = "Final Score: " + score;
+    }
+
+    function endGame() {
+      gameStarted = false;
+      clearInterval(scoreInterval);
+      document.getElementById("game-over").style.display = "flex";
+    }
+
+    AFRAME.registerComponent("player-move", {
+      init: function () {
+        this.el.setAttribute("position", "0 0.5 -5");
+        this.velocity = 0;
+        this.targetX = 0;
+        this.movingLeft = false;
+        this.movingRight = false;
+        this.boundary = 3; // Restriction for movement
+
+        document.addEventListener("keydown", (event) => {
+          if (!gameStarted) return;
+          if (event.key === "ArrowLeft") this.movingLeft = true;
+          if (event.key === "ArrowRight") this.movingRight = true;
+        });
+        document.addEventListener("keyup", (event) => {
+          if (event.key === "ArrowLeft") this.movingLeft = false;
+          if (event.key === "ArrowRight") this.movingRight = false;
+        });
+      },
+      tick: function () {
+        if (!gameStarted) return;
+        let position = this.el.getAttribute("position");
+        let moveSpeed = 0.1;
+
+        if (this.movingLeft) position.x -= moveSpeed;
+        if (this.movingRight) position.x += moveSpeed;
+
+        // Restrict movement within boundary
+        if (position.x > this.boundary) position.x = this.boundary;
+        if (position.x < -this.boundary) position.x = -this.boundary;
+
+        this.el.setAttribute("position", position);
+      },
+    });
+
+    AFRAME.registerComponent("falling-sphere", {
+      init: function () {
+        this.resetPosition();
+      },
+      tick: function () {
+        if (!gameStarted) return;
+        let position = this.el.getAttribute("position");
+        position.y -= (0.1 * score/100) + 0.1;
+        if (position.y < -3) {
+          score += 10;
+          this.resetPosition();
+        }
+        this.el.setAttribute("position", position);
+        this.checkCollision();
+      },
+      resetPosition: function () {
+        this.el.setAttribute("position", {
+          x: (Math.random() - 0.5) * 6,
+          y: 10,
+          z: -5,
+        });
+      },
+      checkCollision: function () {
+        let spherePos = this.el.getAttribute("position");
+        let player = document.querySelector("#player");
+        let playerPos = player.getAttribute("position");
+
+        let playerSize = 0.5;
+        let sphereSize = 1;
+
+        let dx = spherePos.x - playerPos.x;
+        let dy = spherePos.y - playerPos.y;
+        let dz = spherePos.z - playerPos.z;
+        let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (distance < (playerSize + sphereSize) * 0.8) {
+          endGame();
+        }
+      },
+    });
+  </script>
+  <style>
+    #countdown {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 40px;
+      border-radius: 10px;
+      font-size: 48px;
+      font-weight: bold;
+      display: none;
+      z-index: 999999;
+    }
+
+    #score {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 999999;
+    }
+
+    #menu,
+    #game-over {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      text-align: center;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: auto !important;
+    }
+
+    .a-fullscreen #menu,
+    .a-fullscreen #game-over {
+      position: fixed !important;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="countdown"><span id="countdown-number">3</span></div>
+  <div id="score">Score: 0</div>
+  <div id="menu">
+    <h1>Ball Dodge Game</h1>
+    <h3>Use the Arrow Keys to dodge the falling balls.</h3>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+  <div id="game-over" style="display: none;">
+    <h1>Game Over!</h1>
+    <p id="final-score">Final Score: 0</p>
+    <button onclick="location.reload()">Restart</button>
+  </div>
+  <a-scene>
+    <a-assets>
+      <img id="space" src="https://cdn.glitch.me/283e0eb9-1f82-4cc3-a873-44d0f5e49c44%2Fspace.jpg?v=1627508763670">
+      <img id="ground" src="https://cdn.glitch.me/283e0eb9-1f82-4cc3-a873-44d0f5e49c44%2Fgrid.png?v=1627508771668">
+    </a-assets>
+
+    <a-camera position="0 3 0" wasd-controls-enabled="false" look-controls-enabled="false"></a-camera>
+
+    <!-- Player ship with glow and trail -->
+    <a-entity id="player" player-move>
+      <a-sphere color="#00ff00" radius="0.5">
+        <a-animation attribute="material.opacity" from="0.8" to="1" dur="1000" direction="alternate"
+          repeat="indefinite"></a-animation>
+      </a-cone>
+      <a-sphere radius="0.6" material="shader: flat; color: #00ff00; opacity: 0.2">
+        <a-animation attribute="scale" from="1 1 1" to="1.2 1.2 1.2" dur="1000" direction="alternate"
+          repeat="indefinite"></a-animation>
+      </a-sphere>
+    </a-entity>
+
+    <!-- Meteors with glow -->
+    <a-entity geometry="primitive: sphere; radius: 1" falling-sphere>
+      <a-sphere radius="1" material="shader: flat; color: #ff0000; metalness: 0.7; roughness: 0.3">
+        <a-animation attribute="material.emissive" from="#000" to="#300" dur="1000" direction="alternate"
+          repeat="indefinite"></a-animation>
+      </a-sphere>
+      <a-sphere radius="1.2" material="shader: flat; color: #ff0000; opacity: 0.2">
+        <a-animation attribute="scale" from="1 1 1" to="1.2 1.2 1.2" dur="1000" direction="alternate"
+          repeat="indefinite"></a-animation>
+      </a-sphere>
+    </a-entity>
+
+    <!-- Space environment -->
+    <a-sky src="#space" rotation="0 0 0">
+      <a-animation attribute="rotation" to="0 360 0" dur="120000" easing="linear" repeat="indefinite"></a-animation>
+    </a-sky>
+
+    <!-- Ambient lighting -->
+    <a-light type="ambient" color="#445" intensity="2"></a-light>
+    <a-light type="point" intensity="1" position="2 4 4"></a-light>
+  </a-scene>
+</body>
+
+</html>
